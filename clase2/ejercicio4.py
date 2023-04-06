@@ -1,3 +1,7 @@
+"""
+seguir el ejercicio de la clase y reemplazar el print por otro comando, algo que sea mas de bajo nivel.
+"""
+
 import sys
 import os
 print('PID: %d' % os.getpid())
