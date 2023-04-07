@@ -9,6 +9,7 @@ Usar sp , popen, os.
 import subprocess as sp
 import os
 import sys
+import time
 # Creamos el hijo, usando el programa hijo.py y usamos los pipes
 hijo = sp.Popen(['./hijo.py'], stdin=sp.PIPE)
 
@@ -17,6 +18,9 @@ fd = os.open('archivo.txt', os.O_RDONLY)
 texto = (os.read(fd, 5000)).decode()
 for line in texto:
     hijo.stdin.write(line.encode())
+
+print("soy el padre: ", os.getpid())
+# time.sleep(20)
 
 
 # cerrar el pipe de entrada
