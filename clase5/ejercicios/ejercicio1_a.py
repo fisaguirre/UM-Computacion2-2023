@@ -5,7 +5,7 @@
 import os
 import sys
 import time
-fifo_name = "mi_fifo2"
+fifo_name = "mi_fifo23"
 dato1 = 1
 dato2 = 2
 dato3 = 3
