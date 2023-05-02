@@ -2,18 +2,11 @@
 import argparse
 import os
 import sys
-import time
-
 # padre lee archivo, devuelve cantidad de lineas y las lineas
 # se crea una lista de pipes para cada hijo con su padre
 # padre le agrega a cada linea que va a enviar por el pipe un indice--> 1-"text"
 # hijos leen, guardan el indice, hacen split y dan vuelta el texto
 # hijos envian el indice y dado vuelta --> 1-"txet"
-# padre lee todo y hace split en "\n"
-# padre hace split de nuevo segun "-"
-# padre hace un lista.insert(indice,texto) y luego muestra por pantalla todas las lineas
-
-# ----------------------------1 PIPE POR CADA HIJO----------------------------
 
 
 def ArgsParse():
@@ -37,69 +30,54 @@ def readFile(nombreArchivo):
             sys.stdout.write('\n')
 
 
-def invest(lines, childPAmount):
-    rPipeList = []
-    wPipeList = []
-    r0, w0 = os.pipe()
+def invertir(lines, childPAmount):
+    pipe_padre_hijo_r = []
+    pipe_padre_hijo_w = []
+    pipe_hijo_padre_r, pipe_hijo_padre_w = os.pipe()
     for i in range(childPAmount):
         r, w = os.pipe()
-        rPipeList.append(r)
-        wPipeList.append(w)
+        pipe_padre_hijo_r.append(r)
+        pipe_padre_hijo_w.append(w)
 
     for i in range(childPAmount):
         pid = os.fork()
         if (pid == 0):
-            pipe = os.fdopen(rPipeList[i])
+            pipe = os.fdopen(pipe_padre_hijo_r[i])
             while True:
-                leido = pipe.readline()
+                linea_archivo = pipe.readline()
                 print("I'm a children: ", os.getpid(),
-                      " my father: ", os.getppid(), " - text: ", leido)
+                      " my father: ", os.getppid(), " - text: ", linea_archivo)
                 # Si ya agarro una linea la invertimos, escribimos en el pipe y cerramos el hijo
-                if (len(leido) != 0):
-                    leido = str(leido)[:-1]  # delete \n
-                    leido_split = leido.split("-")  # split line
-                    investedText = leido_split[1][::-1]
-                    returnText = leido_split[0]+"-" + \
-                        investedText+"\n"
+                if (len(linea_archivo) != 0):
+                    linea_archivo = str(linea_archivo)[:-1]  # delete \n
+                    split_linea = linea_archivo.split("-")  # split line
+                    linea_invertida = split_linea[1][::-1]
+                    returnText = split_linea[0]+"-" + \
+                        linea_invertida+"\n"
                     print("Hijo: ", i, " - devuelve:", returnText)
-                    os.write(w0, returnText.encode("utf-8"))
-                    time.sleep(30)
+                    os.write(pipe_hijo_padre_w, returnText.encode("utf-8"))
                     pipe.close()
                     os._exit(0)
-                # time.sleep(3)
 
     # Por cada hijo enviamos una linea del archivo
-    print(os.getpid(), " - Soy el padre enviando lineas: ")
     for i in range(childPAmount):
-        texto = str(i)+"-"+lines[i]+"\n"
-        os.write(wPipeList[i], texto.encode("utf-8"))
+        lineaHijo = str(i)+"-"+lines[i]+"\n"
+        os.write(pipe_padre_hijo_w[i], lineaHijo.encode("utf-8"))
     for i in range(childPAmount):
         os.wait()
-    # Leemos por el pipe las lineas invertidas, hacemos decode, split y retornamos para luego mostrarlas
-    while True:
-        # child must read 1 linea not more
-        leido = os.read(r0, 1000)
-        leido = leido.decode()
-        splitLines = leido.split("\n")
-        return splitLines
-        # time.sleep(3)
 
-
-def showInvestedText(returnText):
-    lista = []
-    for text in returnText:
-        if (len(text) != 0):
-            text = text.split("-")
-            lista.insert(int(text[0]), text[1])
-
+    leido = os.read(pipe_hijo_padre_r, 1000).decode()
+    splitLines = leido.split("\n")
+    splitLines.sort()
     print("----------Texto devuelto por los hijos----------")
-    for valor in lista:
-        print(valor)
+    for lineaInvertida in splitLines:
+        if (len(lineaInvertida) != 0):
+            lineaInvertida = lineaInvertida.split("-")
+            print(lineaInvertida[1])
 
 
 if __name__ == "__main__":
     argumento = ArgsParse()
     nombreArchivo = argumento.archivo
     lines, childPAmount = readFile(nombreArchivo)
-    investedText = invest(lines, childPAmount)
-    showInvestedText(investedText)
+    investedText = invertir(lines, childPAmount)
