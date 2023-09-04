@@ -1,0 +1,8 @@
+netstat -ptn | grep 50000
+
+conectar desde cliente:
+telnet 127.0.0.1 50001
+
+pstree | grep
+
+ps fax | grep python

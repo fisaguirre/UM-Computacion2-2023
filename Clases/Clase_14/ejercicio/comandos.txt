@@ -1,0 +1,2 @@
+netstat -ptln
+netstat -ptln | grep "lo que quieras"
