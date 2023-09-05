@@ -1,2 +1,4 @@
 netstat -ptln
 netstat -ptln | grep "lo que quieras"
+
+telnet localhost 50011
