@@ -1,10 +1,18 @@
+import argparse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from PIL import Image
 from io import BytesIO
 import os
 import cgi
 
+def ArgsParse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--ip', dest="ip", required=True, help='Dirección IP')
+    parser.add_argument('-p', '--port', dest="port", required=True, type=int, help='Puerto')
+    return parser.parse_args()
+
 class ImageReceiverHandler(BaseHTTPRequestHandler):
+
     def do_POST(self):
         try:
             content_type, _ = cgi.parse_header(self.headers['Content-Type'])
@@ -31,7 +39,6 @@ class ImageReceiverHandler(BaseHTTPRequestHandler):
 
             # Convertimos la imagen a escala de grises
             #img = img.convert('L')
-
             # Redimensionamos la imagen según el factor de escala proporcionado por el primer servidor
             factor_escala = float(self.headers['Factor-Escala'])
             print("factor: ",factor_escala)
@@ -59,8 +66,10 @@ class ImageReceiverHandler(BaseHTTPRequestHandler):
             self.wfile.write(f'Error: {str(e)}'.encode())
 
 if __name__ == "__main__":
-    server_address = ('localhost', 8081)
+    argumento = ArgsParse()
+    server_address = (argumento.ip, argumento.port)
+
     httpd = HTTPServer(server_address, ImageReceiverHandler)
 
-    print("Segundo servidor de Recepción en puerto 8081")
+    print("Segundo servidor de Recepción en puerto: ",argumento.port)
     httpd.serve_forever()

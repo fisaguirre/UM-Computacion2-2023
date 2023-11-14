@@ -1,3 +1,4 @@
+import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import socketserver
 import cgi
@@ -5,7 +6,21 @@ from PIL import Image
 from io import BytesIO
 import requests
 
+
+def ArgsParse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--ip', dest="ip", required=True, help='Dirección IP')
+    parser.add_argument('-p', '--port', dest="port", required=True, type=int, help='Puerto')
+    parser.add_argument('-f', '--fac', dest="factor", required=True, type=int, help='Factor de escalado')
+    parser.add_argument('-t', '--portb', dest="portB", required=True, type=int, help='Puerto server B')
+
+    #parser.add_argument('-o', '--opt', dest="opcion", required=True, type=int, help='Opcion #A - #B - #C')
+    return parser.parse_args()
+
 class ImageHandler(BaseHTTPRequestHandler):
+    factor_escala = 1.0  # Valor predeterminado
+    puerto_serverB = 8081
+
     def do_POST(self):
         try:
             #analizar content-type, tupla (content type - dict de parametros)
@@ -50,9 +65,8 @@ class ImageHandler(BaseHTTPRequestHandler):
 
     def enviar_a_segundo_servidor(self, img):
         try:
-            url = "http://localhost:8081"
-            factor_escala = 1.5  # Ajusta este valor según tus necesidades
-            headers = {'Factor-Escala': str(factor_escala)}
+            url = "http://localhost:"+str(self.puerto_serverB)
+            headers = {'Factor-Escala': str(self.factor_escala)}
 
             img_byte_array = BytesIO()
             img.save(img_byte_array, format='JPEG')
@@ -70,8 +84,12 @@ class ImageHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    argumento = ArgsParse()
     socketserver.TCPServer.allow_reuse_address = True
-    httpd = ThreadingHTTPServer(("localhost", 8080), ImageHandler)
+    ImageHandler.factor_escala = int(argumento.factor)
+    ImageHandler.puerto_serverB = int(argumento.portB)
+
+    httpd = ThreadingHTTPServer((argumento.ip, argumento.port), ImageHandler)
 
     print("Primer servidor HTTP en puerto 8080")
     httpd.serve_forever()
