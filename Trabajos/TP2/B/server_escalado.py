@@ -2,7 +2,6 @@ import argparse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from PIL import Image
 from io import BytesIO
-import os
 import cgi
 
 def ArgsParse():
@@ -28,26 +27,18 @@ class ImageReceiverHandler(BaseHTTPRequestHandler):
                     environ={'REQUEST_METHOD': 'POST',
                              'CONTENT_TYPE': self.headers['Content-Type']}
                 )
-            if 'file' in form_data:
-                print("esta adentro")
-            print(form_data)
-
+            
             file_item = form_data['file']
             img_data = file_item.file.read()
             # Cargamos la imagen recibida
             img = Image.open(BytesIO(img_data))
 
-            # Convertimos la imagen a escala de grises
-            #img = img.convert('L')
             # Redimensionamos la imagen según el factor de escala proporcionado por el primer servidor
             factor_escala = float(self.headers['Factor-Escala'])
             print("factor: ",factor_escala)
-            new_width = int(img.width * factor_escala)
-            new_height = int(img.height * factor_escala)
+            new_width = int(img.width / factor_escala)
+            new_height = int(img.height / factor_escala)
             img_resized = img.resize((new_width, new_height))
-
-            # Guardamos la imagen redimensionada
-            img_resized.save("imagen_recibida_redimensionada.jpg")
 
             # Enviamos la imagen redimensionada de vuelta al primer servidor
             self.send_response(200)
