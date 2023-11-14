@@ -1,32 +1,32 @@
+#!/usr/bin/python3
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import multiprocessing
+import socket
 import socketserver
 import cgi
 import threading
 from time import sleep
+from urllib.parse import parse_qs
 from PIL import Image
 from io import BytesIO
 import requests
 import queue
 
-colaImagenesCliente = queue.Queue()
-colaImagenesGrises = queue.Queue()
-colaImagenesReducidas = queue.Queue()
+
+cola_compartida = multiprocessing.Queue()
 
 def ArgsParse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--ip', dest="ip", required=True, help='Dirección IP')
-    parser.add_argument('-p', '--port', dest="port", required=True, type=int, help='Puerto')
+    parser.add_argument('-i', '--ip', dest="ip", required=True, help='Dirección IP de escucha')
+    parser.add_argument('-p', '--port', dest="port", required=True, type=int, help='Puerto de escucha')
     parser.add_argument('-f', '--fac', dest="factor", required=True, type=float, help='Factor de escalado')
-    parser.add_argument('-t', '--portb', dest="portB", required=True, type=int, help='Puerto server B')
-
-    #parser.add_argument('-o', '--opt', dest="opcion", required=True, type=int, help='Opcion #A - #B - #C')
+    parser.add_argument('-t', '--portb', dest="portB", required=True, type=int, help='Puerto destino server B')
     return parser.parse_args()
 
 class ImageHandler(BaseHTTPRequestHandler):
     factor_escala = 1.0  # Valor predeterminado
-    puerto_serverB = 8081
+    puerto_serverB = 8081 # puerto predeterminado
 
     def log_message(self, format, *args):
         client_host, client_port = self.client_address
@@ -42,8 +42,7 @@ class ImageHandler(BaseHTTPRequestHandler):
             #analizar content-type, tupla (content type - dict de parametros)
             content_type, _ = cgi.parse_header(self.headers['Content-Type'])
             print(f"Tipo de contenido recibido: {content_type}")
-            #content_length = int(self.headers['Content-Length'])
-            
+           
             if content_type == 'multipart/form-data':
                 #vemos los datos del formulario y lo guardamos en form_data
                 form_data = cgi.FieldStorage(
@@ -55,18 +54,25 @@ class ImageHandler(BaseHTTPRequestHandler):
                 )
 
                 if 'file' in form_data:
-                    img = convertirGris(form_data)
-                    colaImagenesGrises.put(img)
+                    if(self.headers['Factor-Escala']):
+                        self.factor_escala = self.headers['Factor-Escala']
+                    #factor_escala = float(self.headers['Factor-Escala'])
 
+                    proceso_hijo = multiprocessing.Process(target=convertirGris, args=(form_data, cola_compartida))
+                    proceso_hijo.start()
+
+                    img = cola_compartida.get()
+                    proceso_hijo.join()
                     # Enviamos la imagen al segundo servidor
-                    imagenReducida = reducirFactorEscalaServerB(self.puerto_serverB, self.factor_escala, colaImagenesGrises.get())
-
-                    colaImagenesReducidas.put(imagenReducida)
+                    imagenGrisReducida = reducirFactorEscalaServerB(self.puerto_serverB, self.factor_escala, img)
 
                     self.send_response(200)
                     self.send_header('Content-type', 'image/jpeg')
+                    self.send_header('Connection', 'close')
                     self.end_headers()
-                    self.wfile.write(colaImagenesReducidas.get())
+                    self.wfile.write(imagenGrisReducida)
+                    #self.server.shutdown()
+
                     return
                     
             self.send_response(400)
@@ -77,18 +83,15 @@ class ImageHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(f'Error: {str(e)}'.encode())
 
-def guardarImagenesClienteCola():
-     print("")
 
-def convertirGris(form_data):
-    sleep(2)
+def convertirGris(form_data,cola_compartida):
     file_item = form_data['file']
     img_data = file_item.file.read()
     img = Image.open(BytesIO(img_data))
 
     # Convertimos la imagen a escala de grises
     img = img.convert('L')
-    return img
+    cola_compartida.put(img)
      
 def reducirFactorEscalaServerB(puerto_serverB, factor_escala, img):
     try:
@@ -113,10 +116,13 @@ def reducirFactorEscalaServerB(puerto_serverB, factor_escala, img):
 if __name__ == "__main__":
     argumento = ArgsParse()
     socketserver.TCPServer.allow_reuse_address = True
+    
     ImageHandler.factor_escala = float(argumento.factor)
     ImageHandler.puerto_serverB = int(argumento.portB)
 
     httpd = ThreadingHTTPServer((argumento.ip, argumento.port), ImageHandler)
 
-    print("Primer servidor HTTP en puerto 8080")
+    print("Servidor HTTP en puerto: ", argumento.port)
     httpd.serve_forever()
+
+    #httpd.server_close()
